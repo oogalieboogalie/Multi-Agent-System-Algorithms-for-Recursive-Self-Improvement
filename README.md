@@ -67,3 +67,8 @@ python visualize_bellman_comparison.py
 
 ## 📜 License
 MIT License
+
+
+## DISCLAIMER
+
+The TKG references consciousness - I wrote an article about this here - https://ai-philosophy-iota.vercel.app/ - belief or not the system works call it what you want to call it that's just what it was born with.
