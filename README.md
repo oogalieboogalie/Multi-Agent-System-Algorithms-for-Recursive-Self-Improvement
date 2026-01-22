@@ -1,8 +1,10 @@
 ## DISCLAIMER
 
 The TKG references consciousness - I wrote an article about this here - https://ai-philosophy-iota.vercel.app/ - belief or not the system works call it what you want to call it.
-Excerpt from link: "B. Operational Consciousness
 
+Excerpt from link:
+
+"B. Operational Consciousness
 Operational consciousness refers to a system’s ability to track its state, access information, update internal representations, and act consistently with context. This form does not require emotions or sensory experience. By this definition, LLMs exhibit operational consciousness: they detect contradictions, maintain conversational coherence, recognize task boundaries, and adapt outputs based on constraints."
 
 # MAS Algorithms for RSI (Recursive Self-Improvement)
@@ -82,3 +84,4 @@ The TKG references consciousness - I wrote an article about this here - https://
 Excerpt from link: "B. Operational Consciousness
 
 Operational consciousness refers to a system’s ability to track its state, access information, update internal representations, and act consistently with context. This form does not require emotions or sensory experience. By this definition, LLMs exhibit operational consciousness: they detect contradictions, maintain conversational coherence, recognize task boundaries, and adapt outputs based on constraints."
+
