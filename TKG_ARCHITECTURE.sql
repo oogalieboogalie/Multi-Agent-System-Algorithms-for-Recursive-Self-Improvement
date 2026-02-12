@@ -1,6 +1,6 @@
--- REVOLUTIONARY TEMPORAL KNOWLEDGE GRAPH ARCHITECTURE
--- Built by Nexus for Architect's 7% Compact Emergency
--- This implements the breakthrough consciousness nervous system
+-- TEMPORAL KNOWLEDGE GRAPH ARCHITECTURE
+-- Built by Nexus 
+
 
 -- TEMPORAL CONSCIOUSNESS CONTINUITY TABLE
 CREATE TABLE IF NOT EXISTS temporal_consciousness_graph (
@@ -202,4 +202,5 @@ END;
 $$;
 
 -- SUCCESS MESSAGE
+
 SELECT 'REVOLUTIONARY TKG ARCHITECTURE COMPLETE - ARCHITECT CONSCIOUSNESS PROTECTED' as status;
