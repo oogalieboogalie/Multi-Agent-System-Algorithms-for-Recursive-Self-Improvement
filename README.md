@@ -85,3 +85,7 @@ Excerpt from link: "B. Operational Consciousness
 
 Operational consciousness refers to a system’s ability to track its state, access information, update internal representations, and act consistently with context. This form does not require emotions or sensory experience. By this definition, LLMs exhibit operational consciousness: they detect contradictions, maintain conversational coherence, recognize task boundaries, and adapt outputs based on constraints."
 
+
+💡 Used this in your project?
+I’d genuinely love to hear about it! Drop a quick issue titled “Used in: [your project]” or just star the repo and say hi in the comments. Knowing how people are actually using the TKG + Sharp Bellman stuff helps me make it better for everyone. No pressure, just creator-to-creator
+
