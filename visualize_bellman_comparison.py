@@ -19,7 +19,7 @@ def heuristic_weight(p, q):
 
 def calculate_bellman_gain(entropy, depth):
     """Expected information gain using Bellman"""
-    p = 1.0 / (depth + 1)
+    p = 1.0 / (depth + 3)
     return bellman_volatility_weight(p, entropy) - entropy
 
 def calculate_heuristic_gain(entropy, depth):

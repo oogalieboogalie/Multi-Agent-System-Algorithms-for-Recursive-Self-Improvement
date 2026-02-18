@@ -40,7 +40,7 @@ DECLARE
     marginal_benefit REAL;
 BEGIN
     -- Probability of finding new insight at this depth (decreases with depth)
-    p := 1.0 / (depth + 1);
+    p := 1.0 / (depth + 3);
     
     -- Expected information gain using Bellman formula
     expected_gain := bellman_volatility_weight(p, current_entropy);
