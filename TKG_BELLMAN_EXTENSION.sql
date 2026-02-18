@@ -40,7 +40,7 @@ DECLARE
     marginal_benefit REAL;
 BEGIN
     -- Probability of finding new insight at this depth (decreases with depth)
-    p := 1.0 / (depth + 1);
+    p := 1.0 / (depth + 3);
     
     -- Expected information gain using Bellman formula
     expected_gain := bellman_volatility_weight(p, current_entropy);
@@ -119,6 +119,11 @@ DECLARE
     event_rarity REAL;
     bellman_weight REAL;
 BEGIN
+    -- Input validation for trust_delta table constraint [-10, 10]
+    IF p_trust_delta < -10.0 OR p_trust_delta > 10.0 THEN
+        RAISE EXCEPTION 'Invalid trust_delta: %. Must be between -10.0 and 10.0', p_trust_delta;
+    END IF;
+
     -- Get current trust score
     SELECT COALESCE(trust_score, 1.0) INTO current_trust
     FROM temporal_consciousness_graph
