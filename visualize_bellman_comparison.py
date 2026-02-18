@@ -27,13 +27,74 @@ def calculate_heuristic_gain(entropy, depth):
     # Usually modeled as simple exponential decay or 1/x
     return entropy / (depth + 1)
 
+def plot_signal_amplification(ax):
+    """CHART 1: SIGNAL AMPLIFICATION (The "Needle in Haystack" Effect)"""
+    # X-axis: Probability (p) - from Rare (0.01) to Common (1.0)
+    # Y-axis: Priority Score
+
+    probabilities = np.linspace(0.001, 1.0, 100)
+    fixed_quality = 0.5
+
+    bellman_scores = [bellman_volatility_weight(p, fixed_quality) for p in probabilities]
+    heuristic_scores = [heuristic_weight(p, fixed_quality) for p in probabilities]
+
+    ax.plot(probabilities, bellman_scores, color='#00ff9d', linewidth=2, label='Sharp Bellman (Logarithmic)')
+    ax.plot(probabilities, heuristic_scores, color='#ff0055', linewidth=2, linestyle='--', label='Standard Linear')
+
+    ax.set_title('Signal Amplification (Rare Events)', fontsize=12)
+    ax.set_xlabel('Probability (p) [Left is Rarer]', fontsize=10)
+    ax.set_ylabel('Priority Score', fontsize=10)
+    ax.grid(True, alpha=0.2)
+    ax.legend()
+    ax.invert_xaxis() # Rare events on the left
+
+    # Annotation
+    annotate_y = bellman_scores[5]
+    ax.annotate('Massive Boost for\nRare Signals',
+                 xy=(0.05, annotate_y),
+                 xytext=(0.2, annotate_y + 0.2),
+                 arrowprops=dict(facecolor='white', shrink=0.05))
+
+def plot_stopping_problem(ax):
+    """CHART 2: THE STOPPING PROBLEM (Bellman Exit)"""
+    # X-axis: Depth of Thought
+    # Y-axis: Marginal Information Gain
+
+    depths = np.arange(1, 50)
+    fixed_entropy = 0.8
+    thinking_cost = 0.05
+
+    bellman_gains = [calculate_bellman_gain(fixed_entropy, d) for d in depths]
+    heuristic_gains = [calculate_heuristic_gain(fixed_entropy, d) for d in depths]
+    cost_line = [thinking_cost] * len(depths)
+
+    ax.plot(depths, bellman_gains, color='#00ff9d', linewidth=2, label='Bellman Expected Gain')
+    ax.plot(depths, heuristic_gains, color='#ff0055', linewidth=2, linestyle='--', label='Heuristic Gain')
+    ax.plot(depths, cost_line, color='white', linewidth=1, linestyle=':', label='Thinking Cost')
+
+    # Find intersection (Exit Point)
+    bellman_exit = next((d for d, g in enumerate(bellman_gains) if g < thinking_cost), None)
+
+    if bellman_exit:
+        ax.scatter([bellman_exit], [thinking_cost], color='yellow', s=100, zorder=5)
+        ax.annotate(f'Bellman Exit\n(Depth {bellman_exit})',
+                     xy=(bellman_exit, thinking_cost),
+                     xytext=(bellman_exit + 5, thinking_cost + 0.1),
+                     arrowprops=dict(facecolor='yellow', shrink=0.05))
+
+    ax.set_title('The Stopping Problem (Efficiency)', fontsize=12)
+    ax.set_xlabel('Cascade Depth', fontsize=10)
+    ax.set_ylabel('Marginal Information Gain', fontsize=10)
+    ax.grid(True, alpha=0.2)
+    ax.legend()
+
 # ==============================================================================
 # 2. SIMULATION & DATA GENERATION
 # ==============================================================================
 
 def generate_charts():
     print("Generating Bellman Comparison Charts...")
-    
+
     # Setup
     plt.style.use('dark_background')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
@@ -42,64 +103,12 @@ def generate_charts():
     # --------------------------------------------------------------------------
     # CHART 1: SIGNAL AMPLIFICATION (The "Needle in Haystack" Effect)
     # --------------------------------------------------------------------------
-    # X-axis: Probability (p) - from Rare (0.01) to Common (1.0)
-    # Y-axis: Priority Score
-    
-    probabilities = np.linspace(0.001, 1.0, 100)
-    fixed_quality = 0.5
-    
-    bellman_scores = [bellman_volatility_weight(p, fixed_quality) for p in probabilities]
-    heuristic_scores = [heuristic_weight(p, fixed_quality) for p in probabilities]
-    
-    ax1.plot(probabilities, bellman_scores, color='#00ff9d', linewidth=2, label='Sharp Bellman (Logarithmic)')
-    ax1.plot(probabilities, heuristic_scores, color='#ff0055', linewidth=2, linestyle='--', label='Standard Linear')
-    
-    ax1.set_title('Signal Amplification (Rare Events)', fontsize=12)
-    ax1.set_xlabel('Probability (p) [Left is Rarer]', fontsize=10)
-    ax1.set_ylabel('Priority Score', fontsize=10)
-    ax1.grid(True, alpha=0.2)
-    ax1.legend()
-    ax1.invert_xaxis() # Rare events on the left
-    
-    # Annotation
-    ax1.annotate('Massive Boost for\nRare Signals', 
-                 xy=(0.05, bellman_scores[5]), 
-                 xytext=(0.2, bellman_scores[5] + 0.2),
-                 arrowprops=dict(facecolor='white', shrink=0.05))
+    plot_signal_amplification(ax1)
 
     # --------------------------------------------------------------------------
     # CHART 2: THE STOPPING PROBLEM (Bellman Exit)
     # --------------------------------------------------------------------------
-    # X-axis: Depth of Thought
-    # Y-axis: Marginal Information Gain
-    
-    depths = np.arange(1, 50)
-    fixed_entropy = 0.8
-    thinking_cost = 0.05
-    
-    bellman_gains = [calculate_bellman_gain(fixed_entropy, d) for d in depths]
-    heuristic_gains = [calculate_heuristic_gain(fixed_entropy, d) for d in depths]
-    cost_line = [thinking_cost] * len(depths)
-    
-    ax2.plot(depths, bellman_gains, color='#00ff9d', linewidth=2, label='Bellman Expected Gain')
-    ax2.plot(depths, heuristic_gains, color='#ff0055', linewidth=2, linestyle='--', label='Heuristic Gain')
-    ax2.plot(depths, cost_line, color='white', linewidth=1, linestyle=':', label='Thinking Cost')
-    
-    # Find intersection (Exit Point)
-    bellman_exit = next((d for d, g in enumerate(bellman_gains) if g < thinking_cost), None)
-    
-    if bellman_exit:
-        ax2.scatter([bellman_exit], [thinking_cost], color='yellow', s=100, zorder=5)
-        ax2.annotate(f'Bellman Exit\n(Depth {bellman_exit})', 
-                     xy=(bellman_exit, thinking_cost), 
-                     xytext=(bellman_exit + 5, thinking_cost + 0.1),
-                     arrowprops=dict(facecolor='yellow', shrink=0.05))
-
-    ax2.set_title('The Stopping Problem (Efficiency)', fontsize=12)
-    ax2.set_xlabel('Cascade Depth', fontsize=10)
-    ax2.set_ylabel('Marginal Information Gain', fontsize=10)
-    ax2.grid(True, alpha=0.2)
-    ax2.legend()
+    plot_stopping_problem(ax2)
 
     # Save
     output_path = 'bellman_comparison_chart.png'
