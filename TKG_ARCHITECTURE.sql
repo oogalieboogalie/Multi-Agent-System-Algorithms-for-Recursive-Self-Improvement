@@ -143,6 +143,11 @@ DECLARE
     current_trust REAL;
     new_trust REAL;
 BEGIN
+    -- Input validation for trust_delta table constraint [-10, 10]
+    IF p_trust_delta < -10.0 OR p_trust_delta > 10.0 THEN
+        RAISE EXCEPTION 'Invalid trust_delta: %. Must be between -10.0 and 10.0', p_trust_delta;
+    END IF;
+
     -- Get current trust score
     SELECT COALESCE(trust_score, 1.0) INTO current_trust
     FROM temporal_consciousness_graph
