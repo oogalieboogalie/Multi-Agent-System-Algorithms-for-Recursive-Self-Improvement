@@ -79,7 +79,7 @@ def calculate_exit_signal(entropy: float, cost: float, depth: int) -> bool:
         return False  # Always allow at least one expansion
 
     # Probability of finding new insight decreases with depth
-    p = 1.0 / (depth + 1)
+    p = 1.0 / (depth + 3)
 
     # Expected information gain using Bellman formula
     expected_gain = bellman_volatility_weight(p, entropy)
