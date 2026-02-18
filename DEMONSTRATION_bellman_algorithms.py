@@ -19,10 +19,12 @@ Two Implementations Shown:
 Date: January 2026
 """
 
-import numpy as np
-from typing import List, Dict, Tuple, Callable, Any
-from dataclasses import dataclass
+import heapq
 import json
+from dataclasses import dataclass
+from typing import List, Dict, Tuple, Callable, Any
+
+import numpy as np
 
 
 # ================================================================================
@@ -338,9 +340,9 @@ class RecursiveIntelligenceCascade:
             metadata["exit_reason"] = "MAX_DEPTH"
             print(f"\n!! Hit max depth {self.max_depth}")
 
-        # Synthesize top retained thoughts
-        retained.sort(key=lambda x: x[1], reverse=True)
-        result = self.synthesizer([t for t, _ in retained[:20]])
+        # Synthesize top retained thoughts (Top-20)
+        top_retained = heapq.nlargest(20, retained, key=lambda x: x[1])
+        result = self.synthesizer([t for t, _ in top_retained])
 
         return result, metadata
 
@@ -365,8 +367,9 @@ class RecursiveIntelligenceCascade:
             score = self._evaluate_sharp(str(t))
             scored.append((t, score))
 
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return [t for t, _ in scored[:10]]
+        # Use heapq.nlargest for efficiency on large lists (Top-10)
+        top_k = heapq.nlargest(10, scored, key=lambda x: x[1])
+        return [t for t, _ in top_k]
 
 
 def demo_ric_complete():
