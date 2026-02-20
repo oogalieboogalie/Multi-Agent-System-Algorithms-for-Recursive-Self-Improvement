@@ -91,3 +91,55 @@ def test_calculate_exit_signal_zero_cost():
     # At finite depth, p > 0, so p*log(1/p) > 0, so benefit > 0.
     for depth in range(1, 100):
         assert calculate_exit_signal(entropy=0.5, cost=0, depth=depth) is False
+
+def test_bellman_volatility_weight_standard_values():
+    """Test with standard values p=0.5, q=0.5."""
+    p = 0.5
+    q = 0.5
+    # Expected: sqrt(0.5^2 + 0.5 * log(1/0.5))
+    expected = math.sqrt(0.25 + 0.5 * math.log(2))
+    assert math.isclose(bellman_volatility_weight(p, q), expected, rel_tol=1e-9)
+
+def test_bellman_volatility_weight_edge_cases():
+    """Test edge cases for p close to 0 and 1, and q=0."""
+    # p close to 0
+    p_small = 1e-9
+    q = 0.5
+    # Should be close to sqrt(q^2) = q because p*log(1/p) -> 0
+    val_small = bellman_volatility_weight(p_small, q)
+    assert val_small > q
+    assert math.isclose(val_small, q, abs_tol=1e-4)
+
+    # p close to 1
+    p_large = 1.0 - 1e-9
+    # log(1/p) approx log(1) = 0. So result approx q.
+    val_large = bellman_volatility_weight(p_large, q)
+    # The term p*log(1/p) is approx 1e-9, so result is approx q + 1e-9.
+    # We use a slightly larger tolerance to account for this small shift.
+    assert math.isclose(val_large, q, rel_tol=1e-8)
+
+    # q = 0
+    p = 0.5
+    # result = sqrt(0 + p*log(1/p))
+    expected_q0 = math.sqrt(p * math.log(1/p))
+    assert math.isclose(bellman_volatility_weight(p, 0), expected_q0, rel_tol=1e-9)
+
+def test_bellman_volatility_weight_monotonicity():
+    """Test that output increases with q."""
+    p = 0.5
+    q1 = 0.4
+    q2 = 0.6
+    assert bellman_volatility_weight(p, q1) < bellman_volatility_weight(p, q2)
+
+def test_bellman_volatility_weight_peak_behavior():
+    """Test that p*log(1/p) component peaks around p=1/e."""
+    # We test with q=0 to isolate the p term
+    p_peak = 1.0 / math.e
+    val_peak = bellman_volatility_weight(p_peak, 0)
+
+    # Check neighbors
+    val_left = bellman_volatility_weight(p_peak - 0.01, 0)
+    val_right = bellman_volatility_weight(p_peak + 0.01, 0)
+
+    assert val_peak > val_left
+    assert val_peak > val_right
