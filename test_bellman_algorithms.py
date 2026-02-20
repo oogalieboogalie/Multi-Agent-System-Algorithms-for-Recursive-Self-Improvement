@@ -1,6 +1,8 @@
 import sys
 import math
-from unittest.mock import MagicMock
+import pytest
+import importlib
+from unittest.mock import MagicMock, patch
 
 # ================================================================================
 # MOCK NUMPY IMPLEMENTATION
@@ -66,105 +68,119 @@ class FakeNumpy:
             return FakeArray([math.sqrt(x) for x in data.data])
         return math.sqrt(data)
 
-# Inject the fake numpy module
-sys.modules["numpy"] = FakeNumpy()
+@pytest.fixture
+def bellman_module():
+    """Fixture to import the module with FakeNumpy injected."""
+    fake_numpy = FakeNumpy()
 
-import pytest
-# Now we can import the module that uses numpy
-from DEMONSTRATION_bellman_algorithms import (
-    bellman_volatility_weight,
-    calculate_exit_signal,
-    RecursiveIntelligenceCascade,
-    Criterion
-)
+    # We need to ensure 'numpy' is patched before importing the module
+    with patch.dict(sys.modules, {"numpy": fake_numpy}):
+        # Since module might be imported elsewhere or cached, reload is safer
+        # But import_module works for first time
+        if "DEMONSTRATION_bellman_algorithms" in sys.modules:
+            module = importlib.reload(sys.modules["DEMONSTRATION_bellman_algorithms"])
+        else:
+            module = importlib.import_module("DEMONSTRATION_bellman_algorithms")
 
-def test_bellman_volatility_weight_base_cases():
+        yield module
+
+    # Cleanup: remove from sys.modules to prevent leakage
+    if "DEMONSTRATION_bellman_algorithms" in sys.modules:
+        del sys.modules["DEMONSTRATION_bellman_algorithms"]
+
+# ================================================================================
+# TESTS
+# ================================================================================
+
+def test_bellman_volatility_weight_base_cases(bellman_module):
     """Test the U(p, q) formula with base cases."""
+    bellman = bellman_module.bellman_volatility_weight
     # If p <= 0 or p >= 1, should return q
-    assert bellman_volatility_weight(0, 0.5) == 0.5
-    assert bellman_volatility_weight(-0.1, 0.5) == 0.5
-    assert bellman_volatility_weight(1.0, 0.5) == 0.5
-    assert bellman_volatility_weight(1.5, 0.5) == 0.5
+    assert bellman(0, 0.5) == 0.5
+    assert bellman(-0.1, 0.5) == 0.5
+    assert bellman(1.0, 0.5) == 0.5
+    assert bellman(1.5, 0.5) == 0.5
 
-def test_bellman_volatility_weight_amplification_vs_linear():
+def test_bellman_volatility_weight_amplification_vs_linear(bellman_module):
     """Test that Bellman weight provides amplification compared to linear p*q for rare events."""
+    bellman = bellman_module.bellman_volatility_weight
     q = 0.5
     # Rare event
     p = 0.01
 
     linear_gain = q * p
-    bellman_weight = bellman_volatility_weight(p, q)
+    bellman_weight = bellman(p, q)
     bellman_gain = bellman_weight - q
 
     # Bellman gain should be higher than linear gain for rare events
     assert bellman_gain > linear_gain
 
-def test_calculate_exit_signal_depth_zero():
+def test_calculate_exit_signal_depth_zero(bellman_module):
     """Depth 0 should never exit to allow at least one expansion."""
-    assert calculate_exit_signal(entropy=0.5, cost=1.0, depth=0) is False
-    assert calculate_exit_signal(entropy=1.0, cost=10.0, depth=0) is False
+    exit_signal = bellman_module.calculate_exit_signal
+    assert exit_signal(entropy=0.5, cost=1.0, depth=0) is False
+    assert exit_signal(entropy=1.0, cost=10.0, depth=0) is False
 
-def test_calculate_exit_signal_cost_influence():
+def test_calculate_exit_signal_cost_influence(bellman_module):
     """Higher cost should lead to earlier exit."""
+    exit_signal = bellman_module.calculate_exit_signal
     entropy = 0.5
     depth = 1
 
     # Very low cost should not exit
-    assert calculate_exit_signal(entropy, cost=0.0001, depth=depth) is False
+    assert exit_signal(entropy, cost=0.0001, depth=depth) is False
 
     # Very high cost should exit
-    assert calculate_exit_signal(entropy, cost=1.0, depth=depth) is True
+    assert exit_signal(entropy, cost=1.0, depth=depth) is True
 
-def test_calculate_exit_signal_depth_influence():
+def test_calculate_exit_signal_depth_influence(bellman_module):
     """Increasing depth should eventually trigger an exit for non-zero cost."""
+    exit_signal = bellman_module.calculate_exit_signal
     entropy = 0.5
     cost = 0.01
 
     # At some depth, it must stop because p*log(1/p) goes to 0 as depth increases (p=1/(depth+1))
     exit_found = False
     for depth in range(1, 1000):
-        if calculate_exit_signal(entropy, cost, depth):
+        if exit_signal(entropy, cost, depth):
             exit_found = True
             break
     assert exit_found is True
 
-def test_calculate_exit_signal_entropy_influence():
+def test_calculate_exit_signal_entropy_influence(bellman_module):
     """Higher entropy should decrease marginal benefit, leading to earlier exit."""
-    # marginal_benefit = sqrt(entropy^2 + p*log(1/p)) - entropy
-    # This decreases as entropy increases.
-
+    exit_signal = bellman_module.calculate_exit_signal
     cost = 0.05
     depth = 5
 
-    # We check that benefit(high_entropy) < benefit(low_entropy)
-    p = 1.0 / (depth + 1)
-    benefit = lambda e: math.sqrt(e**2 + p * math.log(1/p)) - e
-
-    assert benefit(2.0) < benefit(0.1)
-
     # Test actual exit signal behavior
-    if calculate_exit_signal(0.1, cost, depth):
-        assert calculate_exit_signal(2.0, cost, depth) is True
+    if exit_signal(0.1, cost, depth):
+        assert exit_signal(2.0, cost, depth) is True
 
-def test_calculate_exit_signal_zero_cost():
+def test_calculate_exit_signal_zero_cost(bellman_module):
     """If cost is 0, it should never exit."""
+    exit_signal = bellman_module.calculate_exit_signal
     # At finite depth, p > 0, so p*log(1/p) > 0, so benefit > 0.
     for depth in range(1, 100):
-        assert calculate_exit_signal(entropy=0.5, cost=0, depth=depth) is False
+        assert exit_signal(entropy=0.5, cost=0, depth=depth) is False
 
 # ================================================================================
 # TESTS FOR RecursiveIntelligenceCascade & Criterion
 # ================================================================================
 
-def test_criterion_initialization():
+def test_criterion_initialization(bellman_module):
     """Test Criterion dataclass initialization."""
+    Criterion = bellman_module.Criterion
     c = Criterion("test", 0.5, lambda d, c: True)
     assert c.name == "test"
     assert c.weight == 0.5
     assert c.matcher("any", {}) is True
 
-def test_ric_evaluate_sharp():
+def test_ric_evaluate_sharp(bellman_module):
     """Test _evaluate_sharp method scoring."""
+    Criterion = bellman_module.Criterion
+    RecursiveIntelligenceCascade = bellman_module.RecursiveIntelligenceCascade
+
     # Define criteria
     criteria = [
         Criterion("rare", 0.9, lambda d, c: "rare" in d),
@@ -190,8 +206,11 @@ def test_ric_evaluate_sharp():
     score_none = ric._evaluate_sharp("nothing")
     assert score_none == 0.0
 
-def test_ric_prune_sharp():
+def test_ric_prune_sharp(bellman_module):
     """Test _prune_sharp selects top thoughts."""
+    Criterion = bellman_module.Criterion
+    RecursiveIntelligenceCascade = bellman_module.RecursiveIntelligenceCascade
+
     # Use p=0.37 (approx) which gives max signal boost. weight ~ 0.63.
     ric = RecursiveIntelligenceCascade(
         processor=lambda x: [],
@@ -213,8 +232,11 @@ def test_ric_prune_sharp():
     pruned_many = ric._prune_sharp(thoughts_many)
     assert len(pruned_many) == 10
 
-def test_ric_process_flow():
+def test_ric_process_flow(bellman_module):
     """Test the process method runs and terminates."""
+    Criterion = bellman_module.Criterion
+    RecursiveIntelligenceCascade = bellman_module.RecursiveIntelligenceCascade
+
     # Mock processor to expand
     def processor(thought):
         if len(thought) < 10:
@@ -243,8 +265,11 @@ def test_ric_process_flow():
     # Should run for at least depth 1
     assert metadata["depth_reached"] > 0
 
-def test_ric_bellman_exit():
+def test_ric_bellman_exit(bellman_module):
     """Test that process exits due to Bellman Exit (high cost)."""
+    Criterion = bellman_module.Criterion
+    RecursiveIntelligenceCascade = bellman_module.RecursiveIntelligenceCascade
+
     # High cost ensuring immediate exit or early exit
     ric = RecursiveIntelligenceCascade(
         processor=lambda x: ["expand"],
