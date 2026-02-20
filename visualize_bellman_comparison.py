@@ -15,7 +15,7 @@ def heuristic_weight(p, q):
     """Standard Heuristic: Linear combination (q * (1-p))"""
     # Common approach: Rare events (low p) are just "weighted" by their rarity linearly
     # or often just ignored if p is too low.
-    return q * (1 - p) + q # Simple boost, but linear
+    return q * (1 - p) # Simple boost, but linear
 
 def calculate_bellman_gain(entropy, depth):
     """Expected information gain using Bellman"""
