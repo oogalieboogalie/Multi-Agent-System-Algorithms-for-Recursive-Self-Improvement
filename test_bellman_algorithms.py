@@ -1,18 +1,81 @@
 import sys
-from unittest.mock import MagicMock
 import math
+from unittest.mock import MagicMock
 
-# Mock numpy before importing the module that uses it
-mock_np = MagicMock()
-mock_np.sqrt = math.sqrt
-mock_np.log = math.log
-sys.modules["numpy"] = mock_np
+# ================================================================================
+# MOCK NUMPY IMPLEMENTATION
+# ================================================================================
+
+class FakeArray:
+    """A fake numpy array class supporting basic operations."""
+    def __init__(self, data):
+        self.data = [float(x) for x in data]
+
+    def __len__(self):
+        return len(self.data)
+
+    def sum(self):
+        return sum(self.data)
+
+    def __truediv__(self, other):
+        if isinstance(other, (int, float)):
+            return FakeArray([x / other for x in self.data])
+        raise NotImplementedError(f"Division not supported for {type(other)}")
+
+    def __mul__(self, other):
+        if isinstance(other, FakeArray):
+            return FakeArray([x * y for x, y in zip(self.data, other.data)])
+        if isinstance(other, (int, float)):
+            return FakeArray([x * other for x in self.data])
+        raise NotImplementedError(f"Multiplication not supported for {type(other)}")
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __add__(self, other):
+        if isinstance(other, (int, float)):
+            return FakeArray([x + other for x in self.data])
+        raise NotImplementedError(f"Addition not supported for {type(other)}")
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __repr__(self):
+        return f"FakeArray({self.data})"
+
+class FakeNumpy:
+    """A fake numpy module."""
+    def array(self, data):
+        return FakeArray(data)
+
+    def sum(self, data):
+        if hasattr(data, 'sum'):
+            return data.sum()
+        return sum(data)
+
+    def log(self, data):
+        if isinstance(data, FakeArray):
+            return FakeArray([math.log(x) for x in data.data])
+        return math.log(data)
+
+    def sqrt(self, data):
+        if isinstance(data, FakeArray):
+            return FakeArray([math.sqrt(x) for x in data.data])
+        return math.sqrt(data)
+
+# Inject the fake numpy module
+sys.modules["numpy"] = FakeNumpy()
 
 import pytest
-import numpy as np
+# Now we can import the module that uses numpy
 from DEMONSTRATION_bellman_algorithms import (
     bellman_volatility_weight,
     calculate_exit_signal,
+    RecursiveIntelligenceCascade,
+    Criterion
 )
 
 def test_bellman_volatility_weight_base_cases():
@@ -34,8 +97,6 @@ def test_bellman_volatility_weight_amplification_vs_linear():
     bellman_gain = bellman_weight - q
 
     # Bellman gain should be higher than linear gain for rare events
-    # bellman_gain = sqrt(0.25 + 0.01*log(100)) - 0.5 = 0.544 - 0.5 = 0.044
-    # linear_gain = 0.5 * 0.01 = 0.005
     assert bellman_gain > linear_gain
 
 def test_calculate_exit_signal_depth_zero():
@@ -82,7 +143,6 @@ def test_calculate_exit_signal_entropy_influence():
     assert benefit(2.0) < benefit(0.1)
 
     # Test actual exit signal behavior
-    # If it exits at low entropy, it should also exit at high entropy (for same cost and depth)
     if calculate_exit_signal(0.1, cost, depth):
         assert calculate_exit_signal(2.0, cost, depth) is True
 
@@ -91,3 +151,113 @@ def test_calculate_exit_signal_zero_cost():
     # At finite depth, p > 0, so p*log(1/p) > 0, so benefit > 0.
     for depth in range(1, 100):
         assert calculate_exit_signal(entropy=0.5, cost=0, depth=depth) is False
+
+# ================================================================================
+# TESTS FOR RecursiveIntelligenceCascade & Criterion
+# ================================================================================
+
+def test_criterion_initialization():
+    """Test Criterion dataclass initialization."""
+    c = Criterion("test", 0.5, lambda d, c: True)
+    assert c.name == "test"
+    assert c.weight == 0.5
+    assert c.matcher("any", {}) is True
+
+def test_ric_evaluate_sharp():
+    """Test _evaluate_sharp method scoring."""
+    # Define criteria
+    criteria = [
+        Criterion("rare", 0.9, lambda d, c: "rare" in d),
+        Criterion("common", 0.5, lambda d, c: "common" in d)
+    ]
+
+    ric = RecursiveIntelligenceCascade(
+        processor=lambda x: [],
+        criteria=criteria,
+        synthesizer=lambda x: None
+    )
+
+    # Match rare criterion: p = 1 - 0.9 = 0.1
+    # bellman_volatility_weight(0.1, 0.0) > 0
+    score_rare = ric._evaluate_sharp("rare event")
+    assert score_rare > 0
+
+    # Match common criterion: p = 1 - 0.5 = 0.5
+    score_common = ric._evaluate_sharp("common event")
+    assert score_common > 0
+
+    # No match
+    score_none = ric._evaluate_sharp("nothing")
+    assert score_none == 0.0
+
+def test_ric_prune_sharp():
+    """Test _prune_sharp selects top thoughts."""
+    # Use p=0.37 (approx) which gives max signal boost. weight ~ 0.63.
+    ric = RecursiveIntelligenceCascade(
+        processor=lambda x: [],
+        criteria=[Criterion("high", 0.63, lambda d, c: "high" in d)],
+        synthesizer=lambda x: None
+    )
+
+    thoughts = ["high1", "low1", "high2", "low2", "low3"]
+    # Should select "high1", "high2" first (score > 0)
+
+    pruned = ric._prune_sharp(thoughts)
+    assert "high1" in pruned
+    assert "high2" in pruned
+    # With 5 items, all should be returned as default limit is 10
+    assert len(pruned) == 5
+
+    # Test limiting
+    thoughts_many = [f"high{i}" for i in range(20)]
+    pruned_many = ric._prune_sharp(thoughts_many)
+    assert len(pruned_many) == 10
+
+def test_ric_process_flow():
+    """Test the process method runs and terminates."""
+    # Mock processor to expand
+    def processor(thought):
+        if len(thought) < 10:
+             return [thought + "a", thought + "b"]
+        return []
+
+    # Mock synthesizer
+    synthesizer = MagicMock(return_value="result")
+
+    # Mock criteria to always return some score > 0.3 to retain thoughts
+    criteria = [Criterion("always", 0.63, lambda d, c: True)]
+
+    ric = RecursiveIntelligenceCascade(
+        processor=processor,
+        criteria=criteria,
+        synthesizer=synthesizer,
+        thinking_cost=0.01,
+        max_depth=5
+    )
+
+    result, metadata = ric.process("start")
+
+    assert result == "result"
+    assert metadata["exit_reason"] is not None
+    assert metadata["thoughts_processed"] > 0
+    # Should run for at least depth 1
+    assert metadata["depth_reached"] > 0
+
+def test_ric_bellman_exit():
+    """Test that process exits due to Bellman Exit (high cost)."""
+    # High cost ensuring immediate exit or early exit
+    ric = RecursiveIntelligenceCascade(
+        processor=lambda x: ["expand"],
+        criteria=[Criterion("always", 0.63, lambda d, c: True)],
+        synthesizer=lambda x: "result",
+        thinking_cost=10.0, # Very high cost
+        max_depth=20
+    )
+
+    result, metadata = ric.process("start")
+
+    # Should exit very early due to cost > gain
+    assert metadata["exit_reason"] == "BELLMAN_STOP"
+
+    # Check that it didn't run till max depth
+    assert metadata["depth_reached"] < 20
